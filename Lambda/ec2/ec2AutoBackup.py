@@ -1,27 +1,20 @@
-#Author Daniel Wright
-#Last Updated: 20160212
-
 import collections
 import datetime
 import boto3
 
 ec = boto3.client('ec2')
 
-#Backup function. Add this to a Lambda Function by putting the below block
-# In a Lambda Function: def lambda_handler(event, context):
 
 def lambda_handler(event, context):
 
     reservations = ec.describe_instances(
-        #Filter all instances with the key:pair of AutoBackup:True
         Filters=[
-            {'Name':'tag:AutoBackup', 'Values':['True']},
+            {'Name': 'tag:AutoBackup', 'Values': ['True']},
         ]
     ).get(
         'Reservations', []
     )
 
-    #Locate Instances to be backed up.
     instances = sum(
         [
             [i for i in r['Instances']]
@@ -31,8 +24,6 @@ def lambda_handler(event, context):
 
     for instance in instances:
         try:
-    #specify snapshot retentionDurationDays (Count is based on number of days to keep.)
-    #default snapshot retention is 3 days.
             retentionDurationDays = [
                 int(t.get('Value')) for t in instance['Tags']
                 if t['Key'] == 'retentionDurationDays'][0]
@@ -52,16 +43,18 @@ def lambda_handler(event, context):
 
             to_tag[retentionDurationDays].append(snap['SnapshotId'])
 
-            print "Retaining snapshot %s of volume %s from instance %s for %d days" % (
-                snap['SnapshotId'],
-                vol_id,
-                instance['InstanceId'],
-                retentionDurationDays_days,
+            print
+            "Retaining snapshot %s of volume %s from instance %s for %d days" %
+            (
+                snap['SnapshotId'], vol_id,
+                instance['InstanceId'], retentionDurationDays_days,
             )
         for retentionDurationDays in to_tag.keys():
-            delete_date = datetime.date.today() + datetime.timedelta(days=retentionDurationDays)
+            delete_date = datetime.date.today()
+            + datetime.timedelta(days=retentionDurationDays)
             delete_fmt = delete_date.strftime('%Y-%m-%d')
-            print "Will delete %d snapshots on %s" % (len(to_tag[retentionDurationDays]), delete_fmt)
+            print "Will delete %d snapshots on %s" %
+            (len(to_tag[retentionDurationDays]), delete_fmt)
             ec.create_tags(
                 Resources=to_tag[retentionDurationDays],
                 Tags=[

@@ -1,15 +1,15 @@
-#!/usr/bin/python2.7 -u
-
 import subprocess
 import re
 import datetime
 import time
 import argparse
 
+
 class Action:
     START = 1
     UPDATE = 2
     CREATE = 3
+
 
 class Options:
     region = None
@@ -21,11 +21,12 @@ class Options:
     stack_name = None
     wait = False
 
-# print optional error message, usage doc, and exit
+
 def usage(message=None):
     if message:
         print("\nERROR: %s" % message)
     exit(2)
+
 
 def abort(code, message=None):
     if message:
@@ -33,15 +34,14 @@ def abort(code, message=None):
     print("\nERROR: exit code %d" % code)
     exit(code)
 
-# execute a shell command and return (exitcode, stdout) as results
+
 def run_command(cmd):
     print(cmd)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out,err = p.communicate()
+    out, err = p.communicate()
     return p.returncode, out, err
 
-# extract a string value from the json block using a regex
-# returns a string or none if not found
+
 def find_json_value(key, text):
     match = re.search(r"\"%s\": +\"(.*)\"" % key, text, re.MULTILINE)
     if match:
@@ -49,9 +49,10 @@ def find_json_value(key, text):
     else:
         return None
 
-# runs the describe-stacks call and returns (exitcode, stackstatus)
+
 def check_status(options):
-    cmd = ['aws','cloudformation','describe-stacks','--region',options.region,'--stack-name',options.stack_name]
+    cmd = ['aws', 'cloudformation', 'describe-stacks',
+           '--region', options.region, '--stack-name', options.stack_name]
     err, json, stderr = run_command(cmd)
     if err == 0:
         status = find_json_value('StackStatus', json)
@@ -59,15 +60,18 @@ def check_status(options):
         status = stderr
     return err, status
 
-# writes a time-stamped log to stdout
+
 def log(message):
-    timestamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.datetime.strftime(datetime.datetime.now(),
+                                           '%Y-%m-%d %H:%M:%S')
     print("%s: %s" % (timestamp, message))
 
-# Read the status until it becomes one of the completed statuses
+
 def cfn_wait(options):
     print("Waiting for %s to complete." % options.stack_name)
-    complete_statuses = ['CREATE_COMPLETE', 'DELETE_COMPLETE', 'UPDATE_COMPLETE']
+    complete_statuses = ['CREATE_COMPLETE',
+                         'DELETE_COMPLETE',
+                         'UPDATE_COMPLETE']
     failure_statuses = ['UPDATE_ROLLBACK_COMPLETE', 'ROLLBACK_COMPLETE']
     period = 10.
     while True:
@@ -83,7 +87,7 @@ def cfn_wait(options):
         if delay > 0:
             time.sleep(delay)
 
-# Read the status once, print it, and return.
+
 def cfn_status(options):
     print("Checking status of %s." % options.stack_name)
     err, status = check_status(options)
@@ -91,6 +95,7 @@ def cfn_status(options):
         log(status)
     else:
         abort(err, status)
+
 
 def cfn_start(options):
     print("Looking for existing stack %s." % options.stack_name)
@@ -102,10 +107,11 @@ def cfn_start(options):
     else:
         abort(err, status)
 
+
 def construct_aws_command(options, action):
-    if options.template_url == None:
+    if options.template_url is None:
         usage("Missing template-url")
-    if options.stack_name == None:
+    if options.stack_name is None:
         usage("Missing stack-name")
     cmd = [
         'aws',
@@ -124,6 +130,7 @@ def construct_aws_command(options, action):
     print(cmd)
     return cmd
 
+
 def cfn_update(options):
     print("Updating stack %s." % options.stack_name)
     cmd = construct_aws_command(options, Action.UPDATE)
@@ -131,6 +138,7 @@ def cfn_update(options):
     if err != 0:
         abort(err, stderr)
     print json
+
 
 def cfn_create(options):
     print("Creating stack %s." % options.stack_name)
@@ -140,21 +148,42 @@ def cfn_create(options):
         abort(err, stderr)
     print json
 
+
 def main():
     options = Options()
     options.region = 'us-west-1'
 
     parser = argparse.ArgumentParser(description='Run cloudformation')
-    parser.add_argument("-y", "--yes", dest="confirm", action="store_true", help="Answer yes to any confirmation prompts.")
-    parser.add_argument("-r", "--region", dest="region", type=str, default="us-west-2", help="The AWS region to deploy to.")
-    parser.add_argument("-t", "--template-url", dest="template_url", type=str, help="The template url to run.")
-    parser.add_argument("-p", "--parameters", dest="parameters", type=str, nargs="*", help="The parameters to pass on.")
-    parser.add_argument("-n", "--stack-name", dest="stack_name", type=str, help="The stack name to run.")
-    parser.add_argument("-w", "--wait", dest="wait", action="store_true", help="Wait for the status to one of the *_COMPLETE statuses")
+    parser.add_argument("-y", "--yes", dest="confirm", action="store_true",
+                        help="Answer yes to any confirmation prompts."
+                        )
+    parser.add_argument("-r", "--region", dest="region", type=str,
+                        default="us-west-2",
+                        help="The AWS region to deploy to."
+                        )
+    parser.add_argument("-t", "--template-url", dest="template_url",
+                        type=str, help="The template url to run."
+                        )
+    parser.add_argument("-p", "--parameters", dest="parameters",
+                        type=str, nargs="*",
+                        help="The parameters to pass on."
+                        )
+    parser.add_argument("-n", "--stack-name", dest="stack_name", type=str,
+                        help="The stack name to run."
+                        )
+    parser.add_argument("-w", "--wait", dest="wait", action="store_true",
+                        help="Wait for the status to a *_COMPLETE statuses"
+                        )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-s", "--start", dest="action", action="store_const", const=Action.START)
-    group.add_argument("-u", "--update", dest="action", action="store_const", const=Action.UPDATE)
-    group.add_argument("-c", "--create", dest="action", action="store_const", const=Action.CREATE)
+    group.add_argument("-s", "--start", dest="action", action="store_const",
+                       const=Action.START
+                       )
+    group.add_argument("-u", "--update", dest="action", action="store_const",
+                       const=Action.UPDATE
+                       )
+    group.add_argument("-c", "--create", dest="action", action="store_const",
+                       const=Action.CREATE
+                       )
     args = parser.parse_args()
 
     for arg in vars(args):
